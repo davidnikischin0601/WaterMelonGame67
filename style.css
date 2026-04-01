@@ -1,66 +1,140 @@
 /* =============================================
-   MELON MADNESS 67 - Retro Arcade Stylesheet
+   MELON MADNESS 67 - Responsive Mobile Styles
    ============================================= */
 
-* {
+/* ── Reset & Basis ───────────────────────────── */
+*, *::before, *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-body {
-    background: #0d0d1a;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    font-family: 'Courier New', monospace;
+html, body {
+    width: 100%;
+    height: 100%;
     overflow: hidden;
-    /* Retro scanline effect on the page background */
+    background: #0d0d1a;
+    /* Keine Textauswahl / Tap-Highlight auf Mobile */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* Retro-Scanlines im Seitenhintergrund */
     background-image: repeating-linear-gradient(
         0deg,
         transparent,
         transparent 2px,
-        rgba(0, 0, 0, 0.15) 2px,
-        rgba(0, 0, 0, 0.15) 4px
+        rgba(0, 0, 0, 0.18) 2px,
+        rgba(0, 0, 0, 0.18) 4px
     );
 }
 
+/* ── Spielcontainer ──────────────────────────── */
+/*
+   Füllt den gesamten Viewport.
+   Das Canvas-Element wird von JS via CSS-Transform skaliert
+   und bleibt logisch immer 800×500 px groß.
+*/
 #gameContainer {
-    position: relative;
+    position: fixed;
+    inset: 0;                   /* top/right/bottom/left: 0 */
     display: flex;
     justify-content: center;
     align-items: center;
+    /* Safe-Area für iPhones mit Notch / Home-Indicator */
+    padding: env(safe-area-inset-top)
+             env(safe-area-inset-right)
+             env(safe-area-inset-bottom)
+             env(safe-area-inset-left);
 }
 
+/* ── Canvas ──────────────────────────────────── */
 #gameCanvas {
     display: block;
+    /* Feste logische Größe – Skalierung übernimmt JS (transform: scale) */
+    width:  800px;
+    height: 500px;
+    /* Transformations-Ankerpunkt in der Mitte */
+    transform-origin: center center;
+
+    /* Retro-Rahmen & Glow */
     border: 4px solid #ff6b35;
     box-shadow:
-        0 0 20px rgba(255, 107, 53, 0.7),
-        0 0 60px rgba(255, 107, 53, 0.3),
-        inset 0 0 20px rgba(0, 0, 0, 0.5);
+        0 0 18px  rgba(255, 107, 53, 0.75),
+        0 0 55px  rgba(255, 107, 53, 0.30);
+
+    /* Keine Touch-Events ausserhalb der canvas-Fläche */
+    touch-action: none;
+
     cursor: crosshair;
-    /* Keep crisp pixel art look */
+
+    /* Crisp-Rendering für Pixel-Art-Optik */
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    /* Scale down on small screens */
-    max-width: 100vw;
-    max-height: calc(100vh - 20px);
-    /* Maintain aspect ratio */
-    aspect-ratio: 8 / 5;
 }
 
-/* Optional: Retro CRT screen vignette overlay via pseudo-element on container */
+/* CRT-Vignette-Overlay */
 #gameContainer::after {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    inset: 0;
     pointer-events: none;
     background: radial-gradient(
         ellipse at center,
-        transparent 60%,
-        rgba(0, 0, 0, 0.4) 100%
+        transparent 55%,
+        rgba(0, 0, 0, 0.45) 100%
     );
-    border: 4px solid transparent;
+}
+
+/* ── Portrait-Hinweis ────────────────────────── */
+/*
+   Standardmäßig ausgeblendet.
+   Wird nur auf schmalen Hochformat-Bildschirmen (Handys) gezeigt.
+*/
+#rotateMsg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #0d0d1a;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+    padding: 24px;
+    font-family: 'Courier New', monospace;
+}
+
+.rotate-icon {
+    font-size: 72px;
+    animation: spin 2s ease-in-out infinite alternate;
+}
+
+@keyframes spin {
+    from { transform: rotate(-25deg); }
+    to   { transform: rotate( 25deg); }
+}
+
+.rotate-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #FFD700;
+    letter-spacing: 2px;
+}
+
+.rotate-sub {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+/*
+   Einblenden NUR auf schmalen Hochformat-Screens
+   (Handys, nicht Tablets – Tablets können auch im Hochformat spielen)
+*/
+@media (orientation: portrait) and (max-device-width: 600px) {
+    #rotateMsg { display: flex; }
+}
+/* Zusätzlich: auch wenn Browserfenster sehr schmal und hoch ist */
+@media (orientation: portrait) and (max-width: 500px) {
+    #rotateMsg { display: flex; }
 }

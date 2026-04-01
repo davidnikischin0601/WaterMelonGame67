@@ -1548,6 +1548,33 @@ function draw() {
     ctx.restore();
 }
 
+// ── Responsive Skalierung ─────────────────────────────────────
+// Das Canvas bleibt intern 800×500 px.
+// CSS transform: scale() passt es an jeden Bildschirm an.
+// getBoundingClientRect() in canvasXY() berücksichtigt den Scale
+// automatisch, sodass Maus/Touch-Koordinaten korrekt bleiben.
+function resizeCanvas() {
+    // Verfügbare Fenstergröße (abzgl. Safe-Area kommt vom Browser)
+    const availW = window.innerWidth;
+    const availH = window.innerHeight;
+
+    // Skalierungsfaktor: passt Canvas-Verhältnis (8:5) in den Viewport
+    const scaleX = availW / W;
+    const scaleY = availH / H;
+    const scale  = Math.min(scaleX, scaleY);
+
+    canvas.style.transform = `scale(${scale})`;
+}
+
+// Bei Größenänderung neu skalieren
+window.addEventListener('resize', resizeCanvas);
+// Auf Mobilgeräten: Orientierungswechsel braucht kurze Verzögerung,
+// bis das Betriebssystem die neuen Abmessungen meldet.
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 250));
+
+// Sofort beim Laden ausführen
+resizeCanvas();
+
 // ── Game Loop ─────────────────────────────────────────────────
 let lastTS = 0;
 function loop(ts) {

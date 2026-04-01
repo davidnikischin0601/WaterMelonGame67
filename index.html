@@ -2,14 +2,45 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>MELON MADNESS 67 - Retro Arcade Basketball</title>
+    <!--
+        viewport: width=device-width verhindert Browser-Zoom-Bugs.
+        viewport-fit=cover füllt auch den Notch-Bereich auf iPhones aus.
+        user-scalable=no deaktiviert Pinch-Zoom damit kein unbeabsichtigter
+        Zoom das Spiel stört.
+    -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0,
+                   minimum-scale=1.0, maximum-scale=1.0,
+                   user-scalable=no, viewport-fit=cover">
+
+    <!-- Als App auf dem Homescreen speicherbar (iOS / Android) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0d0d1a">
+
+    <title>MELON MADNESS 67</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <!-- Spielcontainer – wird von JS zentriert & skaliert -->
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="500"></canvas>
     </div>
+
+    <!--
+        Portrait-Hinweis: Wird per CSS nur auf schmalen Hochformat-Screens
+        eingeblendet (Handys < 600 px Breite im Hochformat).
+        Überlagert das Spiel vollflächig.
+    -->
+    <div id="rotateMsg" aria-live="polite">
+        <div class="rotate-icon">🔄</div>
+        <p class="rotate-title">Gerät drehen</p>
+        <p class="rotate-sub">Das Spiel läuft im <strong>Querformat</strong></p>
+        <p class="rotate-sub">Please rotate to <strong>landscape</strong></p>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
