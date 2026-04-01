@@ -1331,17 +1331,22 @@ function drawIntro() {
     ctx.globalAlpha = 1;
 
     // Titel-Box
-    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.beginPath(); rr(ctx,W/2-210,50,420,96,14); ctx.fill();
-    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 3; ctx.beginPath(); rr(ctx,W/2-210,50,420,96,14); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.beginPath(); rr(ctx,W/2-210,50,420,100,14); ctx.fill();
+    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 3; ctx.beginPath(); rr(ctx,W/2-210,50,420,100,14); ctx.stroke();
 
     const tb = Math.sin(frameCount*0.055)*5;
-    ctx.font = 'bold 50px "Courier New"'; ctx.textAlign = 'center';
-    ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 5;
-    ctx.strokeText('MELON', W/2-68, 110+tb);
-    ctx.strokeText('MADNESS', W/2+62, 110+tb);
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 4;
+    // "MELON" und "MADNESS" auf je einer eigenen Zeile, beide mittig
+    ctx.font = 'bold 38px "Courier New"';
+    ctx.strokeText('MELON', W/2, 94+tb);
     ctx.fillStyle = '#FFD700';
-    ctx.fillText('MELON', W/2-68, 110+tb);
-    ctx.fillText('MADNESS', W/2+62, 110+tb);
+    ctx.fillText('MELON', W/2, 94+tb);
+    ctx.font = 'bold 44px "Courier New"';
+    ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 4;
+    ctx.strokeText('MADNESS', W/2, 136+tb);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('MADNESS', W/2, 136+tb);
 
     const h2 = (frameCount*4)%360;
     ctx.font = 'bold 17px "Courier New"';
