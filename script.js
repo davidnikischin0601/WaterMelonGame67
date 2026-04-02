@@ -1351,6 +1351,14 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); rr(ctx,8,98,138,26,7); ctx.fill();
     ctx.fillStyle = z.color; ctx.font = 'bold 11px "Courier New"'; ctx.textAlign = 'left';
     ctx.fillText(`ZONE: ${z.name}  +${z.pts}`, 18, 116);
+
+    // Footer
+    ctx.globalAlpha = 0.45;
+    ctx.font = '9px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#CCCCCC';
+    ctx.fillText('Powered by DaniViki \u00A9 All rights reserved', W / 2, H - 80);
+    ctx.globalAlpha = 1;
 }
 
 // ── Special-Overlay ───────────────────────────────────────────
