@@ -356,12 +356,17 @@ const basket = {
 // ── Hase ──────────────────────────────────────────────────────
 const bunny = {
     x: 520, y: 400, scale: 1.0,
-    state: 'idle',   // idle | moving | taunting | giant_dance | annoyed
+    state: 'idle',   // idle | moving | taunting | giant_dance | annoyed | fainted
     timer: 0, moveTimer: 60, targetX: 520, facing: -1,
     danceFrame: 0,
 
     update(dt) {
         this.timer++;
+
+        if (this.state === 'fainted') {
+            if (this.timer > 180) { this.state = 'idle'; this.timer = 0; }
+            return;
+        }
 
         if (this.state === 'giant_dance') {
             // Scale schnell auf 3×
@@ -401,6 +406,7 @@ const bunny = {
 
     taunt()  { this.state = 'taunting'; this.timer = 0; },
     annoyed(){ this.state = 'annoyed';  this.timer = 0; },
+    faint()  { this.state = 'fainted';  this.timer = 0; },
     startDance() {
         this.state = 'giant_dance';
         this.timer = 0; this.scale = 1.0;
@@ -419,7 +425,8 @@ function launchMelon(vx, vy) {
         vx, vy,
         radius: 14,
         rot: 0, rotSpd: vx * 0.045,
-        bounces: 0
+        bounces: 0,
+        rimBounced: false   // true sobald Ball vom Korbrand abprallt
     };
     melonTrail = [];
     wolf.state = 'throwing'; wolf.timer = 0;
@@ -445,6 +452,7 @@ function checkBasketScore() {
     if (hitL || hitR) {
         melon.vx = melon.vx * -0.5 + (hitL ? 1.2 : -1.2);
         melon.vy *= -0.55;
+        melon.rimBounced = true;
         SFX.bounce();
         burst(melon.x, melon.y, '#FF8800', 5);
     }
@@ -452,7 +460,7 @@ function checkBasketScore() {
 }
 
 function checkBunnyBlock() {
-    if (!melon || bunny.state === 'giant_dance') return false;
+    if (!melon || bunny.state === 'giant_dance' || bunny.state === 'fainted') return false;
     const bh = 55 * bunny.scale;
     return Math.hypot(melon.x - bunny.x, melon.y - (bunny.y - bh * 0.5)) < 26 * bunny.scale;
 }
@@ -1040,6 +1048,8 @@ function drawBunny() {
         drawBunnyDance(bunny.danceFrame, bunny.timer);
     } else if (bunny.state === 'taunting') {
         drawBunnyTaunt(bunny.timer);
+    } else if (bunny.state === 'fainted') {
+        drawBunnyFainted(bunny.timer);
     } else {
         const walking = bunny.state === 'moving';
         drawBunnyNormal(bunny.timer, walking, bunny.state === 'annoyed');
@@ -1200,6 +1210,49 @@ function drawBunnyTaunt(t) {
     ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(18,-68); ctx.lineTo(8,-52); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(8,-52); ctx.lineTo(28,-66); ctx.stroke();
+}
+
+function drawBunnyFainted(t) {
+    // Hase liegt ohnmächtig auf der Seite
+    ctx.save();
+    ctx.rotate(Math.PI * 0.48);  // auf die Seite kippen
+    bBody(0, '#E8D8B0');
+    bHead(0, '#EDE0C0');
+    bEars(0, 0);
+    // Schnauze
+    ctx.fillStyle = '#FFF4E8'; ctx.strokeStyle = '#7A5810'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(5,-50,8,6,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#FF88AA';
+    ctx.beginPath(); ctx.ellipse(6,-52,3.5,2.5,0,0,Math.PI*2); ctx.fill();
+    // X-Augen
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 2.5;
+    [[-4,-58],[8,-58]].forEach(([ex,ey]) => {
+        ctx.beginPath(); ctx.moveTo(ex-4,ey-4); ctx.lineTo(ex+4,ey+4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex+4,ey-4); ctx.lineTo(ex-4,ey+4); ctx.stroke();
+    });
+    // Schwindliger Mund
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(3,-46,5,0.5,Math.PI-0.5); ctx.stroke();
+    ctx.fillStyle = 'white'; ctx.fillRect(2,-47,3,3.5); ctx.fillRect(6,-47,3,3.5);
+    bLimbs(0, false, 0);
+    ctx.restore();
+
+    // Sternchen kreisen um den Kopf
+    for (let i = 0; i < 5; i++) {
+        const ang = (i/5)*Math.PI*2 + t * 0.1;
+        ctx.save();
+        ctx.translate(Math.cos(ang)*30, -68 + Math.sin(ang)*16);
+        ctx.rotate(t*0.12 + i);
+        ctx.fillStyle = `hsl(${(i*72 + t*5)%360},100%,65%)`;
+        star(0,0,7,3,5); ctx.fill();
+        ctx.restore();
+    }
+    // ZZZ
+    ctx.globalAlpha = 0.5 + Math.sin(t*0.09)*0.5;
+    ctx.fillStyle = '#88CCFF'; ctx.font = 'bold 14px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('ZZZ...', 35, -92);
+    ctx.globalAlpha = 1;
 }
 
 function drawBunnyDance(frame, t) {
@@ -1620,11 +1673,25 @@ function update(dt) {
 
         // Hasen-Block
         if (checkBunnyBlock()) {
-            melon.vx *= -0.55; melon.vy *= -0.45;
-            melon.vx += (Math.random()-0.5)*3;
-            SFX.block();
-            burst(bunny.x, bunny.y-30, '#FF88AA', 8);
-            addPopup(bunny.x, bunny.y-55, 'GEBLOCKT!', '#FF88AA');
+            if (melon.rimBounced) {
+                // Ball vom Korbrand → Hase getroffen → KO! +7s
+                bunny.faint();
+                gameTime      += 7;
+                timerFlash     = 120;
+                lastTimeBonus  = 7;
+                addPopup(bunny.x, bunny.y - 75, 'KO! +7s', '#FFD700');
+                burst(bunny.x, bunny.y - 30, '#FFD700', 18);
+                burst(bunny.x, bunny.y - 30, '#FF4444', 10);
+                triggerShake(12, 16);
+                SFX.score3();
+                melon = null; melonTrail = [];
+            } else {
+                melon.vx *= -0.55; melon.vy *= -0.45;
+                melon.vx += (Math.random()-0.5)*3;
+                SFX.block();
+                burst(bunny.x, bunny.y-30, '#FF88AA', 8);
+                addPopup(bunny.x, bunny.y-55, 'GEBLOCKT!', '#FF88AA');
+            }
         }
 
         // Boden-Aufprall
