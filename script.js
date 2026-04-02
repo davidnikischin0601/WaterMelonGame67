@@ -1352,12 +1352,20 @@ function drawHUD() {
     ctx.fillStyle = z.color; ctx.font = 'bold 11px "Courier New"'; ctx.textAlign = 'left';
     ctx.fillText(`ZONE: ${z.name}  +${z.pts}`, 18, 116);
 
-    // Footer
-    ctx.globalAlpha = 0.45;
-    ctx.font = '9px "Courier New"';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#CCCCCC';
-    ctx.fillText('Powered by DaniViki \u00A9 All rights reserved', W / 2, H - 80);
+    // Footer – Regenbogen-Retro
+    const footerText = 'Powered by DaniViki \u00A9 All rights reserved';
+    ctx.font = 'bold 13px "Courier New"';
+    ctx.textAlign = 'left';
+    const fw = ctx.measureText(footerText).width;
+    let fx = W / 2 - fw / 2;
+    const fy = H - 80;
+    for (let i = 0; i < footerText.length; i++) {
+        const hue = (frameCount * 2 + i * 14) % 360;
+        ctx.fillStyle = `hsl(${hue},100%,65%)`;
+        ctx.globalAlpha = 0.9;
+        ctx.fillText(footerText[i], fx, fy);
+        fx += ctx.measureText(footerText[i]).width;
+    }
     ctx.globalAlpha = 1;
 }
 
