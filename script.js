@@ -1685,6 +1685,7 @@ function update(dt) {
                 triggerShake(12, 16);
                 SFX.score3();
                 melon = null; melonTrail = [];
+                return;
             } else {
                 melon.vx *= -0.55; melon.vy *= -0.45;
                 melon.vx += (Math.random()-0.5)*3;
