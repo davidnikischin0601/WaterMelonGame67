@@ -24,7 +24,7 @@ let state = S.INTRO;
 let score        = 0;
 let highscore    = parseInt(localStorage.getItem('mm67_hs') || '0');
 let combo        = 0;
-let gameTime     = 90 * 60;   // Frames (90 Sekunden bei 60 fps)
+let gameTime     = 90;   // Sekunden (direkt, kein Frame-Umrechnung)
 let frameCount   = 0;
 const triggeredSpecials = new Set(); // Scores die bereits einen Special ausgelöst haben
 
@@ -33,6 +33,7 @@ const triggeredSpecials = new Set(); // Scores die bereits einen Special ausgel�
 //  → ODER Quersumme = 13  (weil 6+7=13)
 function isSpecialScore(n) {
     if (n <= 0) return false;
+    if (n === 13) return true;  // 6+7=13 → explizit feiern
     const s = String(n);
     if (s.includes('6') || s.includes('7')) return true;
     return s.split('').reduce((a, d) => a + parseInt(d), 0) === 13;
@@ -43,6 +44,7 @@ function getSpecialInfo(n) {
     const s  = String(n);
     const h6 = s.includes('6'), h7 = s.includes('7');
     const qs = s.split('').reduce((a, d) => a + parseInt(d), 0);
+    if (n === 13)   return { title: `13!`,   sub: `★ 6+7=13! DER 13 MOVE! ★`,   dur: 280 };
     if (h6 && h7)   return { title: `${n}!`, sub: `★ DER ${n} MOVE! ★`,          dur: 280 };
     if (qs === 13)  return { title: `${n}!`, sub: `★ QUERSUMME 13 MOVE! ★`,      dur: 190 };
     if (h6)         return { title: `${n}!`, sub: `★ DIE SECHS MOVE! ★`,         dur: 155 };
@@ -52,6 +54,10 @@ function getSpecialInfo(n) {
 // ── Bildschirm-Shake ──────────────────────────────────────────
 let shakeX = 0, shakeY = 0, shakePow = 0, shakeFrames = 0;
 function triggerShake(power, frames) { shakePow = power; shakeFrames = frames; }
+
+// Timer-Flash wenn Zeit addiert wird
+let timerFlash     = 0;   // Frames lang grün leuchten
+let lastTimeBonus  = 0;   // zuletzt addierte Sekunden (für Anzeige)
 
 // ── Web-Audio-API (Retro-Sounds) ──────────────────────────────
 let sfx = null;
@@ -285,9 +291,11 @@ canvas.addEventListener('touchcancel', () => {
 // ── Wolf ──────────────────────────────────────────────────────
 const wolf = {
     x: 130, y: 400,
-    state: 'idle',   // idle | throwing | celebrating | disappointed
+    state: 'idle',   // idle | throwing | celebrating | disappointed | giant_dance
     timer: 0,
     holdingMelon: true,
+    scale: 1.0,
+    danceFrame: 0,
     // Pulsierend für Atemeffekt
     breathe: 0,
 
@@ -302,6 +310,16 @@ const wolf = {
         this.timer++;
         this.breathe = Math.sin(this.timer * 0.05) * 2;
 
+        if (this.state === 'giant_dance') {
+            if (this.scale < 3.0) this.scale = Math.min(3.0, this.scale + 0.08);
+            this.danceFrame = Math.floor(this.timer / 7) % 8;
+            this.x = W / 2 - 130;
+            return;
+        }
+
+        // Nach Special → zurückskalieren
+        if (this.scale > 1.0) this.scale = Math.max(1.0, this.scale - 0.06);
+
         // Bewegen mit Pfeiltasten / WASD / On-Screen-Buttons
         if (state === S.PLAYING && !melon) {
             const spd = 2.8 * dt * 60;
@@ -313,6 +331,12 @@ const wolf = {
         if (this.state === 'throwing'     && this.timer > 28) this.state = 'idle';
         if (this.state === 'celebrating'  && this.timer > 65) { this.state = 'idle'; this.holdingMelon = true; }
         if (this.state === 'disappointed' && this.timer > 80) { this.state = 'idle'; this.holdingMelon = true; }
+    },
+
+    startDance() {
+        this.state = 'giant_dance';
+        this.timer = 0; this.scale = 1.0;
+        this.x = W / 2 - 130;
     }
 };
 
@@ -440,6 +464,12 @@ function onScore(pts) {
     const total = pts + bonus;
     score += total;
 
+    // Zeit-Bonus je nach Zone: +5s (WEIT) / +3s (NORMAL) / +1s (NAH)
+    const timeBonus = pts === 3 ? 5 : pts === 2 ? 3 : 1;
+    gameTime      += timeBonus;
+    timerFlash     = 120;
+    lastTimeBonus  = timeBonus;
+
     wolf.state = 'celebrating'; wolf.timer = 0;
     bunny.annoyed();
 
@@ -473,6 +503,7 @@ function onMiss() {
 const SPECIAL = {
     active: false, timer: 0, duration: 260, score: 0,
     titleText: '', subText: '',
+    wolfDancing: false,
     // Warteschlange für mehrere schnell aufeinander folgende Auslöser
     queue: [],
 
@@ -483,13 +514,17 @@ const SPECIAL = {
             return;
         }
         const info = getSpecialInfo(sc);
-        this.active    = true;
-        this.timer     = 0;
-        this.score     = sc;
-        this.duration  = info.dur;
-        this.titleText = info.title;
-        this.subText   = info.sub;
+        const s = String(sc);
+        const bothDigits = (s.includes('6') && s.includes('7')) || sc === 13;
+        this.active      = true;
+        this.timer       = 0;
+        this.score       = sc;
+        this.duration    = info.dur;
+        this.titleText   = info.title;
+        this.subText     = info.sub;
+        this.wolfDancing = bothDigits;
         bunny.startDance();
+        if (bothDigits) wolf.startDance();
         SFX.special();
         triggerShake(18, 22);
         state = S.SPECIAL;
@@ -504,6 +539,11 @@ const SPECIAL = {
             this.active = false;
             bunny.state = 'idle'; bunny.scale = 1.0;
             bunny.x = 520; bunny.targetX = 520; bunny.timer = 0;
+            if (this.wolfDancing) {
+                wolf.state = 'idle'; wolf.scale = 1.0;
+                wolf.x = 130; wolf.holdingMelon = true; wolf.timer = 0;
+            }
+            this.wolfDancing = false;
             state = S.PLAYING;
             // Nächsten aus Warteschlange starten
             if (this.queue.length > 0) {
@@ -775,6 +815,7 @@ function drawMobileButtons() {
 function drawWolf() {
     ctx.save();
     ctx.translate(wolf.x, wolf.y);
+    if (wolf.scale !== 1.0) ctx.scale(wolf.scale, wolf.scale);
 
     // Schatten
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
@@ -782,7 +823,8 @@ function drawWolf() {
 
     const t = wolf.timer, b = wolf.breathe;
 
-    if      (wolf.state === 'celebrating')  drawWolfCelebrate(t);
+    if      (wolf.state === 'giant_dance')  drawWolfDance(wolf.danceFrame, t);
+    else if (wolf.state === 'celebrating')  drawWolfCelebrate(t);
     else if (wolf.state === 'disappointed') drawWolfDisappoint(t);
     else                                    drawWolfIdle(t, b, wolf.state === 'throwing');
 
@@ -935,6 +977,52 @@ function drawWolfDisappoint(t) {
     wArm( 12,-38,-Math.PI*0.15, false);
     wLegs(0, 0);
     wTail(0, 0, -8);
+}
+
+function drawWolfDance(frame, t) {
+    // Verrückter Siegestanz – der Wolf-67-Move!
+    const kick = (frame % 4 < 2) ? -0.45 : 0.3;
+    const armL = (frame % 8 < 4) ? -Math.PI*0.9 : Math.PI*0.1;
+    const armR = (frame % 8 < 4) ? Math.PI*0.1 : -Math.PI*0.9;
+    const jumpH = (frame % 2 === 0) ? 14 : 0;
+
+    ctx.translate(0, -jumpH);
+
+    wBody(0, 0, '#5C5C5C');
+    wHead(0, 0, '#6C6C6C');
+    wEars(0, 0, Math.sin(t * 0.25) * 20);
+    wMuzzle(0, 0, true);  // Mund auf (Jubel)
+
+    // Arme wild wedeln
+    const wave = Math.sin(t * 0.3) * 0.3;
+    wArm(-12, -38, armL + wave, false);
+    wArm( 12, -38, armR - wave, false);
+
+    // Beine kicken
+    ctx.fillStyle = '#707070'; ctx.strokeStyle = '#404040'; ctx.lineWidth = 2;
+    ctx.save(); ctx.translate(-7, -7); ctx.rotate(kick);
+    ctx.beginPath(); rr(ctx,-5,0,10,20,3); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0,23,8,4,kick*0.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.save(); ctx.translate(7, -7); ctx.rotate(-kick);
+    ctx.beginPath(); rr(ctx,-5,0,10,20,3); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0,23,8,4,-kick*0.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // Schweif wedelt schnell
+    wTail(0, 0, Math.sin(t * 0.2) * 22);
+
+    // Umlaufende Sternchen
+    for (let i = 0; i < 7; i++) {
+        const ang = (i/7)*Math.PI*2 + t*0.08;
+        const rad = 72 + Math.sin(t*0.14+i)*14;
+        ctx.save();
+        ctx.translate(Math.cos(ang)*rad, Math.sin(ang)*rad - 35);
+        ctx.rotate(t*0.1+i);
+        ctx.fillStyle = `hsl(${(t*6+i*51)%360},100%,65%)`;
+        star(0,0, 9+Math.sin(t*0.15+i)*3, 3,5); ctx.fill();
+        ctx.restore();
+    }
 }
 
 // ── Hase zeichnen ─────────────────────────────────────────────
@@ -1221,17 +1309,32 @@ function drawHUD() {
     ctx.fillText(`REKORD: ${String(highscore).padStart(4,'0')}`, 18, 84);
 
     // Timer
-    const secs = Math.ceil(gameTime / 60);
-    const timerCol = secs <= 10 ? '#FF4444' : '#FFD700';
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); rr(ctx,W-118,8,110,52,9); ctx.fill();
-    ctx.strokeStyle = timerCol; ctx.lineWidth = 2; ctx.beginPath(); rr(ctx,W-118,8,110,52,9); ctx.stroke();
+    const secs = Math.ceil(gameTime);
+    const flashing = timerFlash > 0;
+    if (flashing) timerFlash--;
+    const timerCol = flashing ? '#00FF88' : secs <= 10 ? '#FF4444' : '#FFD700';
+    const timerBg  = flashing ? `rgba(0,100,40,0.85)` : 'rgba(0,0,0,0.55)';
+    // Box größer wenn Zeit addiert wird (zeigt +Xs)
+    const boxH = flashing ? 70 : 52;
+    ctx.fillStyle = timerBg; ctx.beginPath(); rr(ctx,W-118,8,110,boxH,9); ctx.fill();
+    ctx.strokeStyle = timerCol; ctx.lineWidth = flashing ? 3 : 2;
+    ctx.beginPath(); rr(ctx,W-118,8,110,boxH,9); ctx.stroke();
     ctx.fillStyle = timerCol; ctx.font = 'bold 13px "Courier New"'; ctx.textAlign = 'right';
     ctx.fillText('ZEIT:', W-18, 27);
     ctx.font = 'bold 24px "Courier New"';
     ctx.fillText(`${secs}s`, W-18, 50);
+    // +Xs direkt in der Box anzeigen
+    if (flashing && lastTimeBonus > 0) {
+        const pulse = Math.sin(timerFlash * 0.18) * 0.3 + 0.7;
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = '#00FF88';
+        ctx.font = 'bold 16px "Courier New"';
+        ctx.fillText(`+${lastTimeBonus}s ▲`, W - 18, 72);
+        ctx.globalAlpha = 1;
+    }
 
     // Timer-Blinken unter 10s
-    if (secs <= 10 && frameCount % 30 < 15) {
+    if (gameTime <= 10 && frameCount % 30 < 15) {
         ctx.fillStyle = 'rgba(255,50,50,0.15)'; ctx.fillRect(0,0,W,H);
     }
 
@@ -1264,15 +1367,19 @@ function drawSpecialOverlay() {
     ctx.strokeStyle = `rgba(255,30,30,${border})`; ctx.lineWidth = 12;
     ctx.strokeRect(6,6,W-12,H-12);
 
-    // "67!" oder "76!" Text – groß, bunt, springend
+    // Textposition: zentriert wenn beide tanzen, sonst links
+    const textCX = SPECIAL.wolfDancing ? W / 2 : W * 0.33;
+    const textCY = SPECIAL.wolfDancing ? H / 2 - 85 : H / 2 - 50;
+
+    // "67!" Text – groß, bunt, springend
     const tScale = prog < 0.14 ? prog/0.14*1.25 : prog < 0.2 ? lerp(1.25,1.0,(prog-0.14)/0.06) : 1.0;
     const tBounce = Math.sin(t*0.15)*9;
     const hue = (t*7)%360;
 
     ctx.save();
-    ctx.translate(W*0.33, H/2 - 50 + tBounce);
+    ctx.translate(textCX, textCY + tBounce);
     ctx.scale(tScale, tScale);
-    ctx.font = 'bold 92px "Courier New"';
+    ctx.font = `bold ${SPECIAL.wolfDancing ? 78 : 92}px "Courier New"`;
     ctx.textAlign = 'center';
     ctx.strokeStyle = '#000'; ctx.lineWidth = 10;
     ctx.strokeText(SPECIAL.titleText, 0, 0);
@@ -1284,20 +1391,20 @@ function drawSpecialOverlay() {
     if (t > 28) {
         const alpha = Math.min(1, (t-28)/18);
         ctx.globalAlpha = alpha;
-        ctx.font = 'bold 26px "Courier New"'; ctx.textAlign = 'center';
+        ctx.font = `bold ${SPECIAL.wolfDancing ? 21 : 26}px "Courier New"`; ctx.textAlign = 'center';
         ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
-        ctx.strokeText(SPECIAL.subText, W*0.33, H/2 + 48);
+        ctx.strokeText(SPECIAL.subText, textCX, textCY + (SPECIAL.wolfDancing ? 90 : 98));
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(SPECIAL.subText, W*0.33, H/2 + 48);
+        ctx.fillText(SPECIAL.subText, textCX, textCY + (SPECIAL.wolfDancing ? 90 : 98));
         ctx.globalAlpha = 1;
     }
 
-    // Umlaufende Sterne auf der linken Seite
+    // Umlaufende Sterne
     for (let i = 0; i < 8; i++) {
         const a2 = (i/8)*Math.PI*2 + t*0.07;
         const r2 = 115 + Math.sin(t*0.09+i)*22;
         ctx.save();
-        ctx.translate(W*0.33 + Math.cos(a2)*r2, H/2 - 20 + Math.sin(a2)*70);
+        ctx.translate(textCX + Math.cos(a2)*r2, textCY + 30 + Math.sin(a2)*70);
         ctx.rotate(t*0.08+i);
         ctx.fillStyle = `hsl(${(t*8+i*45)%360},100%,68%)`;
         star(0,0, 11+Math.sin(t*0.18+i)*3, 4,5); ctx.fill();
@@ -1309,7 +1416,7 @@ function drawSpecialOverlay() {
         const fadeOut = Math.max(0, 1 - (prog-0.85)/0.15);
         ctx.globalAlpha = fadeOut;
         ctx.fillStyle = '#FFD700'; ctx.font = 'bold 18px "Courier New"'; ctx.textAlign = 'center';
-        ctx.fillText('WEITER GEHT\'S!', W*0.33, H/2 + 90);
+        ctx.fillText('WEITER GEHT\'S!', textCX, textCY + (SPECIAL.wolfDancing ? 130 : 140));
         ctx.globalAlpha = 1;
     }
 }
@@ -1422,14 +1529,16 @@ function startGame() {
     state          = S.PLAYING;
     score          = 0;
     combo          = 0;
-    gameTime       = 90 * 60;
+    gameTime       = 90;
     melon          = null;
     melonTrail     = [];
     particles      = [];
     popups         = [];
     triggeredSpecials.clear();
     SPECIAL.active = false; SPECIAL.queue = [];
-    wolf.x         = 130; wolf.state = 'idle'; wolf.holdingMelon = true; wolf.timer = 0;
+    timerFlash     = 0;
+    lastTimeBonus  = 0;
+    wolf.x         = 130; wolf.state = 'idle'; wolf.holdingMelon = true; wolf.timer = 0; wolf.scale = 1.0; wolf.danceFrame = 0;
     bunny.x        = 520; bunny.state = 'idle'; bunny.scale = 1.0; bunny.timer = 0;
     basket.x       = basket.baseX; basket.dir = 1;
 }
@@ -1465,11 +1574,11 @@ function update(dt) {
         SPECIAL.update(); bunny.update(dt); return;
     }
 
-    // Timer
-    gameTime -= dt * 60;
+    // Timer (gameTime in Sekunden, dt in Sekunden)
+    gameTime -= dt;
     if (gameTime <= 0) { gameTime = 0; endGame(); return; }
-    // Ticking unter 10s
-    if (gameTime <= 10*60 && Math.floor(gameTime) % 60 === 59) SFX.tick();
+    // Ticking unter 10s: einmal pro Sekunde
+    if (gameTime <= 10 && Math.ceil(gameTime) !== Math.ceil(gameTime + dt)) SFX.tick();
 
     wolf.update(dt);
     basket.update(dt);
@@ -1544,10 +1653,10 @@ function draw() {
         drawBunny();
         drawWolf();
         drawParticles();
+        if (state === S.SPECIAL) drawSpecialOverlay();
         drawPopups();
         drawHUD();
         drawMobileButtons();
-        if (state === S.SPECIAL) drawSpecialOverlay();
     }
 
     ctx.restore();
