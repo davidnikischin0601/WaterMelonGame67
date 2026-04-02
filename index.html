@@ -24,6 +24,19 @@
 </head>
 <body>
 
+    <!-- Passwort-Screen – blockiert Zugang bis Passwort korrekt -->
+    <div id="passwordScreen">
+        <div id="passwordBox">
+            <div id="pwMelon">&#127813;</div>
+            <div id="pwTitle">MELON MADNESS 67</div>
+            <div id="pwSubtitle">&#9733; PRIVATE EDITION &#9733;</div>
+            <div id="pwLabel">ZUGANG NUR MIT PASSWORT</div>
+            <input id="pwInput" type="password" placeholder="Passwort eingeben..." autocomplete="off" spellcheck="false" />
+            <button id="pwBtn">EINTRETEN</button>
+            <div id="pwError"></div>
+        </div>
+    </div>
+
     <!-- Spielcontainer – wird von JS zentriert & skaliert -->
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="500"></canvas>
@@ -35,12 +48,60 @@
         Überlagert das Spiel vollflächig.
     -->
     <div id="rotateMsg" aria-live="polite">
-        <div class="rotate-icon">🔄</div>
+        <div class="rotate-icon">&#128260;</div>
         <p class="rotate-title">Gerät drehen</p>
         <p class="rotate-sub">Das Spiel läuft im <strong>Querformat</strong></p>
         <p class="rotate-sub">Please rotate to <strong>landscape</strong></p>
     </div>
 
-    <script src="script.js?v=4"></script>
+    <script>
+    (function() {
+        var KEY = 'mm67_auth_v1';
+        var HASH = '6461766930363031'; // hex von "davi0601"
+
+        function strToHex(s) {
+            var r = '';
+            for (var i = 0; i < s.length; i++) r += s.charCodeAt(i).toString(16);
+            return r;
+        }
+
+        function unlock() {
+            sessionStorage.setItem(KEY, HASH);
+            document.getElementById('passwordScreen').style.display = 'none';
+        }
+
+        // Bereits authentifiziert in dieser Sitzung?
+        if (sessionStorage.getItem(KEY) === HASH) {
+            document.getElementById('passwordScreen').style.display = 'none';
+            return;
+        }
+
+        // Passwort-Prüfung
+        function attempt() {
+            var val = document.getElementById('pwInput').value;
+            if (strToHex(val) === HASH) {
+                unlock();
+            } else {
+                var err = document.getElementById('pwError');
+                err.textContent = 'FALSCHES PASSWORT!';
+                document.getElementById('pwInput').value = '';
+                document.getElementById('pwInput').classList.add('pw-shake');
+                setTimeout(function() {
+                    document.getElementById('pwInput').classList.remove('pw-shake');
+                    err.textContent = '';
+                }, 1200);
+            }
+        }
+
+        document.getElementById('pwBtn').addEventListener('click', attempt);
+        document.getElementById('pwInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') attempt();
+        });
+        // Fokus auf Eingabefeld setzen
+        setTimeout(function() { document.getElementById('pwInput').focus(); }, 100);
+    })();
+    </script>
+
+    <script src="script.js?v=5"></script>
 </body>
 </html>
